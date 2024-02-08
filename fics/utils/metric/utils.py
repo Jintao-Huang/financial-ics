@@ -26,3 +26,20 @@ def spearman_corrcoef_fast(y_pred: Tensor, y_true: Tensor) -> Tensor:
         y_pred = torch.stack([_calc_rank_fast(yp) for yp in y_pred.unbind(dim=1)], dim=1)
         y_true = torch.stack([_calc_rank_fast(yt) for yt in y_true.unbind(dim=1)], dim=1)
     return pearson_corrcoef(y_pred, y_true)
+
+
+def pairwise_corrcoef_amend(X: Tensor, Y: Tensor) -> Tensor:
+    """
+    X: [N, F]
+    Y: [N2, F]
+    Z: [N, N2]
+    """
+    X = torch.concat([X, -X], dim=-1)
+    Y = torch.concat([Y, -Y], dim=-1)
+    X_mean = X.mean(dim=1, keepdim=True)  # [N]
+    Y_mean = Y.mean(dim=1, keepdim=True)  # [N2]
+    X_diff = X - X_mean
+    Y_diff = Y - Y_mean
+    X_std = torch.einsum("ij,ij->i", X_diff, X_diff).sqrt_()  # ignore coef
+    Y_std = torch.einsum("ij,ij->i", Y_diff, Y_diff).sqrt_()
+    return (X_diff @ (Y_diff).T).div_(X_std[:, None]).div_(Y_std)
