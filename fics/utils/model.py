@@ -1,9 +1,6 @@
 from transformers import AutoConfig
 from torch import dtype as Dtype
-from swift.llm import (
-    get_model_tokenizer, register_model, get_model_tokenizer_from_repo,
-)
-import os
+from swift.llm import register_model, get_model_tokenizer_from_repo
 from .lbert import LBertForMaskedLM, set_lbert_config
 from transformers.models.roberta import RobertaForMaskedLM
 from transformers.models.longformer import LongformerForMaskedLM

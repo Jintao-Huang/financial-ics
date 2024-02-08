@@ -1,2 +1,4 @@
-from .model import get_model_tokenizer, CustomModelType
-from .dataset import get_dataset, CustomDatasetName
+from .model import CustomModelType
+from .dataset import CustomDatasetName
+from swift.llm import get_model_tokenizer, get_dataset
+

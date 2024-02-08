@@ -2,7 +2,7 @@ from datasets import Dataset as HfDataset
 from numpy.random import RandomState
 import pandas as pd
 from pandas import DataFrame
-from swift.llm import register_dataset, get_dataset
+from swift.llm import register_dataset
 from swift.utils import read_from_jsonl, transform_jsonl_to_df
 from typing import List
 from tqdm import tqdm
@@ -89,13 +89,3 @@ def get_tenk_demo_dataset(dataset_id_or_path: str,
         'naics': df['naics'].tolist(),
         'text': text_list, 
     })
-
-if __name__ == '__main__':
-    # for test
-    train_dataset, val_dataset = get_dataset([CustomDatasetName.tenk_pretrained_mini], 0.01, 42)
-    print(f'train_dataset: {train_dataset}')
-    print(f'val_dataset: {val_dataset}')
-    eval_dataset, _ = get_dataset([CustomDatasetName.tenk_eval])
-    print(f'eval_dataset: {eval_dataset}')
-    demo_dataset, _ = get_dataset([CustomDatasetName.tenk_demo])
-    print(f'demo_dataset: {demo_dataset}')
