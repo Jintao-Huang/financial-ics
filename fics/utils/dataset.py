@@ -6,6 +6,7 @@ from swift.llm import register_dataset
 from swift.utils import read_from_jsonl, transform_jsonl_to_df
 from typing import List
 from tqdm import tqdm
+from ..dataset_utils import train_dataset_path, eval_dataset_path, demo_dataset_path
 import os
 
 
@@ -44,10 +45,10 @@ def read_raw_text(df: DataFrame) -> List[str]:
     return text
 
 @register_dataset(CustomDatasetName.tenk_pretrained_mini, 
-                  'finance_10k/preprocessed/train/train.csv',
+                  train_dataset_path,
                   function_kwargs={'dataset_sample': 100})
 @register_dataset(CustomDatasetName.tenk_pretrained, 
-                  'finance_10k/preprocessed/train/train.csv')
+                  train_dataset_path)
 def get_tenk_report_pretrained_dataset(
         dataset_id_or_path: str,
         dataset_sample: int = -1,
@@ -59,7 +60,7 @@ def get_tenk_report_pretrained_dataset(
     return HfDataset.from_dict({'text': text_list})
 
 
-@register_dataset(CustomDatasetName.tenk_eval, 'finance_10k/preprocessed/eval/eval.jsonl')
+@register_dataset(CustomDatasetName.tenk_eval, eval_dataset_path)
 def get_tenk_eval_dataset(dataset_id_or_path: str, 
                           **kwargs) -> HfDataset:
     obj_list = read_from_jsonl(dataset_id_or_path)
@@ -76,7 +77,7 @@ def get_tenk_eval_dataset(dataset_id_or_path: str,
     })
 
 @register_dataset(CustomDatasetName.tenk_demo,
-                  'finance_10k/preprocessed/demo/demo.csv')
+                  demo_dataset_path)
 def get_tenk_demo_dataset(dataset_id_or_path: str, 
                           **kwargs) -> HfDataset:
     df = pd.read_csv(dataset_id_or_path, keep_default_na=False)

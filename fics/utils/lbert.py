@@ -169,6 +169,7 @@ class LBertLayer(RobertaLayer):
         self.intermediate = RobertaIntermediate(config)
         self.output = RobertaOutput(config)
 
+
 class LBertEncoder(RobertaEncoder):
     def __init__(self, config):
         super(RobertaEncoder, self).__init__()
