@@ -1,0 +1,5 @@
+/.vscode/
+/finance_10k/
+*.so
+*.cpp
+*.o

@@ -1,0 +1,8 @@
+ms-swift>=1.6.0
+torchmetrics
+scikit-learn
+cython
+pandas
+tqdm
+numpy
+gradio
