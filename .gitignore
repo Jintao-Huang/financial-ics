@@ -3,3 +3,6 @@
 *.so
 *.cpp
 *.o
+/dist
+/build
+*.egg-info/
