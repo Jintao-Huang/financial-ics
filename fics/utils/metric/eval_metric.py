@@ -314,5 +314,5 @@ class IcsMetrics:
         print(res)
         res.update(self._compute_logistic_regression_sic3(inputs))
         res.update(self._compute_logistic_regression_naics4(inputs))
-        res.update({'ebd_cos_sim_mean': inputs['embedding_cos_sim'].mean()})
+        res.update({'ebd_cos_sim_mean': inputs['embedding_cos_sim'].mean().item()})
         return res
