@@ -12,16 +12,18 @@ import os
 
 class CustomDatasetName:
     tenk_pretrained = 'tenk-pretrained'
-    tenk_pretrained_mini = 'tenk-pretrained-mini'  # for test
     tenk_eval = 'tenk-eval'
     tenk_demo = 'tenk-demo'
+    tenk_pretrained_mini = 'tenk-pretrained-mini'  # for test
+    tenk_eval_mini = 'tenk-eval-mini'  # for test
 
 
 def random_select_df(df: DataFrame, dataset_sample: int) -> DataFrame:
-    if dataset_sample >= 0:
-        random_state = RandomState(42)
-        idxs = random_state.permutation(dataset_sample)
-        df = df.iloc[idxs]
+    if dataset_sample < 0:
+        return df
+    random_state = RandomState(42)
+    idxs = random_state.permutation(dataset_sample)
+    df = df.iloc[idxs]
     return df
 
 def read_raw_text(df: DataFrame) -> List[str]:
@@ -49,22 +51,25 @@ def read_raw_text(df: DataFrame) -> List[str]:
                   function_kwargs={'dataset_sample': 100})
 @register_dataset(CustomDatasetName.tenk_pretrained, 
                   train_dataset_path)
-def get_tenk_report_pretrained_dataset(
-        dataset_id_or_path: str,
-        dataset_sample: int = -1,
-        **kwargs
+def get_tenk_pretrained_dataset(
+    dataset_id_or_path: str, 
+    **kwargs
 ) -> HfDataset:
+    dataset_sample = kwargs.get('dataset_sample', -1)
     df = pd.read_csv(dataset_id_or_path)
     df = random_select_df(df, dataset_sample)  # for mini
     text_list = read_raw_text(df)
     return HfDataset.from_dict({'text': text_list})
 
-
+@register_dataset(CustomDatasetName.tenk_eval_mini, eval_dataset_path,
+                  function_kwargs={'dataset_sample': 100})
 @register_dataset(CustomDatasetName.tenk_eval, eval_dataset_path)
 def get_tenk_eval_dataset(dataset_id_or_path: str, 
                           **kwargs) -> HfDataset:
+    dataset_sample = kwargs.get('dataset_sample', -1)
     obj_list = read_from_jsonl(dataset_id_or_path)
     df = transform_jsonl_to_df(obj_list)
+    df = random_select_df(df, dataset_sample)  # for mini
     text_list = read_raw_text(df)
     del df['item1'], df['item1a']
     return HfDataset.from_dict({

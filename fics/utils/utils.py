@@ -9,8 +9,12 @@ from torch.autograd.function import Function, FunctionCtx
 from torch import Tensor
 
 os.environ['TOKENIZERS_PARALLELISM'] = 'true'
+_logger_mapping = {}
 
 def get_logger(verbose_format: bool = False) -> Logger:
+    if verbose_format in _logger_mapping:
+        return _logger_mapping[verbose_format]
+
     if is_master():
         level = logging.INFO
     else:
@@ -27,6 +31,7 @@ def get_logger(verbose_format: bool = False) -> Logger:
     handler.setFormatter(logging.Formatter(_format))
     handler.setLevel(level)
     logger.addHandler(handler)
+    _logger_mapping[verbose_format] = logger
     return logger
 
 
