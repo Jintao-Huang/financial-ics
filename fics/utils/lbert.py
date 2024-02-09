@@ -21,7 +21,6 @@ def set_lbert_config(config: RobertaConfig) -> None:
     }
     config.rope_theta = 10000.
     config.window_size = 512
-    config.global_token = 1
 
 
 class LBertEmbeddings(RobertaEmbeddings):
