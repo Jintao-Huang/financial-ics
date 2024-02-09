@@ -133,6 +133,7 @@ class IcsMetrics:
         stock_corrcoef_sorted = stock_corrcoef[torch.arange(N)[:, None], idx]
 
         # create file
+        logger.info(f'self.jsonl_path: {self.jsonl_path}')
         with open(self.jsonl_path, "w", encoding="utf-8") as f:
             pass
         for cik, date, sic, embedding_cos_sim, stock_corrcoef in zip(
@@ -142,11 +143,11 @@ class IcsMetrics:
             keys = ['cik', 'name', 'date', 'sic', 'desc', 
                     'embedding_cos_sim', 'stock_corrcoef']
             res = {k: [] for k in keys}
-            cik: Tensor = cik[masks]
-            date: Tensor = date[masks]
-            sic: Tensor = sic[masks]
-            embedding_cos_sim: Tensor = embedding_cos_sim[masks]
-            stock_corrcoef: Tensor = stock_corrcoef[masks]
+            cik: Tensor = cik[:self.peer_firm_threshold]
+            date: Tensor = date[:self.peer_firm_threshold]
+            sic: Tensor = sic[:self.peer_firm_threshold]
+            embedding_cos_sim: Tensor = embedding_cos_sim[:self.peer_firm_threshold]
+            stock_corrcoef: Tensor = stock_corrcoef[:self.peer_firm_threshold]
 
             for i in range(cik.shape[0]):
                 cik_item = cik[i].item()
@@ -294,9 +295,11 @@ class IcsMetrics:
             inputs = self._prepare_inputs()
         else:
             from_pkl_path = os.path.join(from_output_dir, self.pkl_fname)
+            logger.info(f'from_pkl_path: {from_pkl_path}')
             with open(from_pkl_path, 'rb') as f:
                 inputs = pickle.load(f)
         if self.save_to_pickle and from_output_dir != self.output_dir:
+            logger.info(f'self.pkl_path: {self.pkl_path}')
             with open(self.pkl_path, 'wb') as f:
                 pickle.dump(inputs, f)
         self._to_device(inputs)

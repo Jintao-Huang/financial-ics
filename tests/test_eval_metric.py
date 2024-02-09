@@ -2,7 +2,7 @@ from fics import IcsMetrics, get_dataset, CustomDatasetName
 import torch
 
 if __name__ == '__main__':
-    ics_metric = IcsMetrics()
+    ics_metric = IcsMetrics('output/test_eval')
     dataset = get_dataset(CustomDatasetName.tenk_eval_mini)[0]
     cik = torch.tensor(dataset['cik'])
     ebd = torch.randn(cik.shape[0], 768)
