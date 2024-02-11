@@ -14,7 +14,9 @@ def get_long_doc_preprocess(
 ) -> Callable[[Dict[str, Any]], List[Dict[str, List[int]]]]:
     assert max_length is not None
     def preprocess(example: Dict[str, Any]) -> List[Dict[str, List[int]]]:
-        num_bos_token = getattr(tokenizer, 'num_bos_token', 1)
+        num_bos_token = 1
+        if hasattr(tokenizer, 'num_global_token'):
+            num_bos_token = 0
         text = example['text']
         token_list = tokenizer(text, return_attention_mask=False, 
                                add_special_tokens=False)['input_ids']

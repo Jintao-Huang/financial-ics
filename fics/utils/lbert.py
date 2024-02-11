@@ -1,12 +1,15 @@
 from transformers.models.roberta import (
     RobertaPreTrainedModel, RobertaForCausalLM, RobertaConfig
 )
+from transformers.modeling_outputs import BaseModelOutputWithPoolingAndCrossAttentions
+
 from transformers.models.roberta.modeling_roberta import (
     RobertaLMHead, RobertaModel, RobertaEmbeddings, RobertaPooler, RobertaEncoder, RobertaLayer,
-    RobertaIntermediate, RobertaOutput, RobertaAttention, RobertaSelfAttention, RobertaSelfOutput
+    RobertaIntermediate, RobertaOutput, RobertaAttention, RobertaSelfAttention, RobertaSelfOutput,
+    create_position_ids_from_input_ids
 )
 from transformers.utils import logging
-from typing import Optional, Tuple
+from typing import Optional, Tuple, List, Union
 import torch.nn as nn
 import torch
 import math
@@ -17,16 +20,16 @@ from transformers.models.llama.modeling_llama import (
 logger = logging.get_logger(__name__)
 
 
-def set_lbert_config(config: RobertaConfig) -> None:
+def set_lbert_config(config: RobertaConfig, **kwargs) -> None:
     config.position_embedding_type = 'rotary'
-    config.max_position_embeddings = 131072
+    config.max_position_embeddings = kwargs.get('max_position_embeddings', 131072)
     config.rope_scaling = {
         "factor": 1,
         "type": "linear"
     }
     config.rope_theta = 10000.
-    config.window_size = 512
-    config.num_bos_token = 1
+    config.window_size = kwargs.get('window_size', 512)
+    config.num_global_token = kwargs.get('num_global_token', 1)
 
 
 class LBertEmbeddings(RobertaEmbeddings):
@@ -34,6 +37,7 @@ class LBertEmbeddings(RobertaEmbeddings):
         super(RobertaEmbeddings, self).__init__()
         self.word_embeddings = nn.Embedding(config.vocab_size, config.hidden_size, padding_idx=config.pad_token_id)
         self.token_type_embeddings = nn.Embedding(config.type_vocab_size, config.hidden_size)
+        self.global_token_embedding = nn.Embedding(config.num_global_token, config.hidden_size, padding_idx=config.pad_token_id)
 
         # self.LayerNorm is not snake-cased to stick with TensorFlow model variable name and be able to load
         # any TensorFlow checkpoint file
@@ -48,7 +52,19 @@ class LBertEmbeddings(RobertaEmbeddings):
             "token_type_ids", torch.zeros(self.position_ids.size(), dtype=torch.long), persistent=False
         )
         self.padding_idx = config.pad_token_id
+        self.config = config
 
+
+    def forward(
+        self, *args, **kwargs
+    ):
+        embeddings = super().forward(*args, **kwargs)
+        device = embeddings.device
+        num_global_token = self.config.num_global_token
+        pos_ids = torch.arange(num_global_token, device=device)[None].repeat(embeddings.shape[0], 1)
+        inpus_global_embeds = self.global_token_embedding(pos_ids)
+        embeddings = torch.concat([inpus_global_embeds, embeddings], dim=1)
+        return embeddings
 
 def shift_x_reverse(x: torch.Tensor, window_size: int):
     N, H, LdW, window_size, E = x.shape
@@ -106,8 +122,8 @@ class LBertSelfAttention(RobertaSelfAttention):
     def global_attn(self, q: torch.Tensor, k: torch.Tensor, v: torch.Tensor, 
                     attention_mask: torch.Tensor) -> torch.Tensor:
 
-        num_bos_token = self.config.num_bos_token
-        global_q = q[:, :, :num_bos_token]
+        num_global_token = self.config.num_global_token
+        global_q = q[:, :, :num_global_token]
         # This is actually dropping out entire tokens to attend to, which might
         # seem a bit unusual, but is taken from the original Transformer paper.
         attention_scores = torch.matmul(global_q, k.transpose(-1, -2))
@@ -123,16 +139,16 @@ class LBertSelfAttention(RobertaSelfAttention):
     def block_attn(self, q: torch.Tensor, k: torch.Tensor, v: torch.Tensor,
                 attention_mask: torch.Tensor) -> torch.Tensor:
         config = self.config
-        num_bos_token = config.num_bos_token
-        block_q = q[:, :, num_bos_token:]
-        block_k = k[:, :, num_bos_token:]
-        block_v = v[:, :, num_bos_token:]
+        num_global_token = config.num_global_token
+        block_q = q[:, :, num_global_token:]
+        block_k = k[:, :, num_global_token:]
+        block_v = v[:, :, num_global_token:]
 
         block_q = shift_x(block_q, config.window_size)
         block_k = shift_x(block_k, config.window_size)
         block_v = shift_x(block_v, config.window_size)
-        global_k = k[:, :, None, :num_bos_token].repeat((1, 1, block_k.shape[2], 1, 1))
-        global_v = v[:, :, None, :num_bos_token].repeat((1, 1, block_v.shape[2], 1, 1))
+        global_k = k[:, :, None, :num_global_token].repeat((1, 1, block_k.shape[2], 1, 1))
+        global_v = v[:, :, None, :num_global_token].repeat((1, 1, block_v.shape[2], 1, 1))
         block_k = torch.concat([global_k, block_k], dim=3)
         block_v = torch.concat([global_v, block_v], dim=3)
 
@@ -141,9 +157,9 @@ class LBertSelfAttention(RobertaSelfAttention):
         attention_scores = attention_scores / math.sqrt(self.attention_head_size)
         if attention_mask is not None:
             # Apply the attention mask is (precomputed for all layers in RobertaModel forward() function)
-            block_attn_mask = attention_mask[..., num_bos_token:]
+            block_attn_mask = attention_mask[..., num_global_token:]
             block_attn_mask = shift_attention_mask(block_attn_mask, config.window_size, self.num_attention_heads)
-            _0 = block_attn_mask.new_zeros(*block_attn_mask.shape[:4], num_bos_token)
+            _0 = block_attn_mask.new_zeros(*block_attn_mask.shape[:4], num_global_token)
             block_attn_mask = torch.concat([_0, block_attn_mask], dim=-1)
             attention_scores = attention_scores + block_attn_mask
 
@@ -170,6 +186,11 @@ class LBertSelfAttention(RobertaSelfAttention):
         key_layer = self.transpose_for_scores(self.key(hidden_states))
         value_layer = self.transpose_for_scores(self.value(hidden_states))
         query_layer = self.transpose_for_scores(mixed_query_layer)
+        if hasattr(self, 'rotary_emb'):
+            kv_seq_len = key_layer.shape[-2]
+            cos, sin = self.rotary_emb(value_layer, seq_len=kv_seq_len)
+            position_ids = torch.arange(0, kv_seq_len, dtype=torch.long, device=query_layer.device)[None]
+            query_layer, key_layer = apply_rotary_pos_emb(query_layer, key_layer, cos, sin, position_ids)
 
         global_output = self.global_attn(query_layer, key_layer, value_layer, attention_mask)
         block_output = self.block_attn(query_layer, key_layer, value_layer, attention_mask)
@@ -226,6 +247,19 @@ class LBertModel(RobertaModel):
 
         # Initialize weights and apply final processing
         self.post_init()
+
+    def forward(
+        self,
+        input_ids: Optional[torch.Tensor] = None,
+        attention_mask: Optional[torch.Tensor] = None,
+        *args, **kwargs
+    ) -> Union[Tuple[torch.Tensor], BaseModelOutputWithPoolingAndCrossAttentions]:
+        global_attention_mask = torch.ones((self.config.num_global_token,), device=input_ids.device
+                                            )[None].repeat(input_ids.shape[0], 1)
+        attention_mask = torch.concat([global_attention_mask, attention_mask], dim=1)
+        output = super().forward(input_ids, attention_mask, *args, **kwargs)
+        output.last_hidden_state = output.last_hidden_state[:,  self.config.num_global_token:]
+        return output
 
 class LBertForMaskedLM(RobertaForCausalLM):
     _tied_weights_keys = ["lm_head.decoder.weight", "lm_head.decoder.bias"]

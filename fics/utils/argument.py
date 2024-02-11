@@ -67,6 +67,10 @@ class TrainArguments:
     pooling: str = field(
         default='mean',
         metadata={'choices': ['cls', 'mean']})
+    # lbert
+    lbert_window_size: int = 512
+    lbert_max_position_embeddings: int = 131072
+    lbert_num_global_token: int = 1
     # prototype loss
     temperature: float = 0.1
     num_prototype_with_grad: Optional[int] = None
