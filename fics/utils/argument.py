@@ -60,6 +60,7 @@ class TrainArguments:
     save_total_limit: int = 2  # save last and best. -1: all checkpoints
     logging_steps: int = 5
     dataloader_num_workers: int = 1
+    preprocess_num_proc: int = 1
 
     # other
     ignore_args_error: bool = False  # True: notebook compatibility

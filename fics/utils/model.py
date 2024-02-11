@@ -68,4 +68,6 @@ def get_lbert_model_tokenizer(model_dir: str,
     set_lbert_config(model_config)
     model, tokenizer = get_model_tokenizer_roberta(model_dir, torch_dtype, model_kwargs, load_model, 
                                                    model_config=model_config, **kwargs)
+    tokenizer.padding_to = model_config.window_size
+    tokenizer.num_bos_token = model_config.num_bos_token
     return model, tokenizer

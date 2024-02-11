@@ -41,13 +41,12 @@ class Task:
         self.compute_metrics = compute_metrics
         self.preprocess_logits_for_metrics = preprocess_logits_for_metrics
 
-    def init_task(self, tokenizer: PreTrainedTokenizerBase, min_length: Optional[int]= None, 
+    def init_task(self, tokenizer: PreTrainedTokenizerBase,
                   max_length: Optional[int]=None) -> None:
         self.tokenizer = tokenizer
-        self.min_length = min_length
         self.max_length = max_length
 
-        self.preprocess = self.get_preprocess(tokenizer, self.min_length, self.max_length)
+        self.preprocess = self.get_preprocess(tokenizer, self.max_length)
         self.collate_fn = self.get_collate_fn(tokenizer)
 
 TASK_MAPPING: Dict[str, Task] = {}
@@ -79,8 +78,7 @@ register_task(TaskType.eval_tenk, Task(
 
 def get_task(task_type: str, 
              tokenizer: PreTrainedTokenizerBase, 
-             min_length: Optional[int]= None, 
              max_length: Optional[int]=None) -> Task:
     task = TASK_MAPPING[task_type]
-    task.init_task(tokenizer, min_length, max_length)
+    task.init_task(tokenizer, max_length)
     return task

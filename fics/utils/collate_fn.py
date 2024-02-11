@@ -14,17 +14,18 @@ def get_long_doc_preprocess(
 ) -> Callable[[Dict[str, Any]], List[Dict[str, List[int]]]]:
     assert max_length is not None
     def preprocess(example: Dict[str, Any]) -> List[Dict[str, List[int]]]:
+        num_bos_token = getattr(tokenizer, 'num_bos_token', 1)
         text = example['text']
         token_list = tokenizer(text, return_attention_mask=False, 
                                add_special_tokens=False)['input_ids']
         res = []
         lo = 0
         while True:
-            hi = lo + max_length - 1
+            hi = lo + max_length - num_bos_token
             tokens = []
-            tokens += [tokenizer.bos_token_id]
+            tokens += [tokenizer.bos_token_id] * num_bos_token
             tokens += token_list[lo:hi]
-            if len(tokens) < min_length:
+            if len(tokens) <= num_bos_token:
                 break
             r = {'input_ids': tokens}
             if for_evaluate:
@@ -66,8 +67,8 @@ def maybe_padding_to(tokenizer, inputs) -> None:
     if hasattr(tokenizer, 'padding_to'):
         padding_to = tokenizer.padding_to
         length = inputs['input_ids'].shape[-1]
-        if hasattr(tokenizer, 'global_token'):
-            length = length - tokenizer.global_token
+        if hasattr(tokenizer, 'num_bos_token'):
+            length = length - tokenizer.num_bos_token
         padding_to = math.ceil(length / padding_to) * padding_to
         padding_length = padding_to - length
         inputs['input_ids'] = F.pad(inputs['input_ids'], [0, padding_length],

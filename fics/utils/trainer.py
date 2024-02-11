@@ -5,13 +5,16 @@ from torch.nn import CrossEntropyLoss
 from swift.trainers import Trainer
 from torchmetrics.functional import pairwise_cosine_similarity
 import torch.nn.functional as F
-from typing import Tuple
+from typing import Tuple, NamedTuple, Optional
 from swift.utils import is_dist, is_master
+from torch import Tensor
 import torch.distributed as dist
 from .utils import GatherLayer
 from .metric import IcsMetrics
+MaskedLMOutput = NamedTuple('MaskedLMOutput', loss=Optional[Tensor], logits=Optional[Tensor])
 
-def _masked_lm_forward(model, inputs) -> Tuple[Tensor, Tensor]:
+
+def _masked_lm_forward(model, inputs) -> Tuple[Tensor, MaskedLMOutput]:
     """for save memory"""
     labels = inputs.pop('labels')
     outputs = model.roberta(
@@ -26,7 +29,8 @@ def _masked_lm_forward(model, inputs) -> Tuple[Tensor, Tensor]:
     logits = model.lm_head(sequence_output)
     loss_fct = CrossEntropyLoss()
     masked_lm_loss = loss_fct(logits, labels)
-    return masked_lm_loss, logits
+    output = MaskedLMOutput(loss=masked_lm_loss, logits=logits)
+    return masked_lm_loss, output
 
 class MaskedLMTrainer(Trainer):
     def compute_loss(self, model, inputs, return_outputs=None):
@@ -37,11 +41,6 @@ class MaskedLMTrainer(Trainer):
         preds = outputs.logits.argmax(dim=1)
         labels = inputs['labels']
         masks = labels != -100
-        if return_outputs:
-            logits = torch.zeros((*labels.shape, outputs.logits.shape[-1]), 
-                    device=outputs.logits.device, dtype=outputs.logits.dtype)
-            logits[masks] = outputs.logits
-            outputs.logits = logits
         acc: Tensor = (preds == labels[masks]).float().mean()
         if model.training:
             if 'acc' not in self._custom_metrics:
@@ -94,7 +93,6 @@ class ContrastiveLearningTrainer(Trainer):
                         ckpt_dir =output_dir,
                         dataset=dataset, 
                         max_length=self.x_args.max_length,
-                        min_length=self.x_args.min_length,
                         eval_dataset_sample=-1,
                         eval_batch_size=eval_batch_size,
                         normalize=self.x_args.normalize,
