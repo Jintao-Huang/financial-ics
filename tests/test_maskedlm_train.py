@@ -5,6 +5,9 @@ import torch
 
 def test_lbert_train():
     train_main(TrainArguments(CustomModelType.lbert, dataset=[CustomDatasetName.tenk_pretrained_mini],
+                              train_dataset_sample=100, eval_steps=5))
+    torch.cuda.empty_cache()
+    train_main(TrainArguments(CustomModelType.lbert, dataset=[CustomDatasetName.tenk_pretrained_mini],
                               train_dataset_sample=100, eval_steps=5, lbert_num_global_token=16,
                               batch_size=2))
 

@@ -37,7 +37,7 @@ class LBertEmbeddings(RobertaEmbeddings):
         super(RobertaEmbeddings, self).__init__()
         self.word_embeddings = nn.Embedding(config.vocab_size, config.hidden_size, padding_idx=config.pad_token_id)
         self.token_type_embeddings = nn.Embedding(config.type_vocab_size, config.hidden_size)
-        self.global_token_embedding = nn.Embedding(config.num_global_token, config.hidden_size, padding_idx=config.pad_token_id)
+        self.global_token_embedding = nn.Embedding(config.num_global_token, config.hidden_size)
 
         # self.LayerNorm is not snake-cased to stick with TensorFlow model variable name and be able to load
         # any TensorFlow checkpoint file
