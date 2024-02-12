@@ -26,11 +26,21 @@ cd financial-ics
 pip install -e .
 ```
 
+## Preparing the Experimental Environment
+
+Downloading the Dataset
+
+```
+
+```
+
 ## 🚀 Training
 MaskedLM Training
 
 ```bash
-
+bash scripts/lbert/maskedlm_train.sh
+# ddp
+bash scripts/lbert/maskedlm_train_ddp.sh
 ```
 
 
@@ -43,6 +53,7 @@ Contrastive Learning
 ## 🎯 Evaluation
 
 ```bash
+
 ```
 
 ## ✨ Demo
