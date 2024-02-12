@@ -56,56 +56,17 @@ class PrototypeLoss:
     def __call__(self, logits: Tensor) -> Tuple[Tensor, Tensor]:
         batch_size, ebd_size = logits.shape
         prototype = logits.reshape((batch_size // 2, 2, ebd_size)).mean(1)
-        # if not hasattr(self, 'prototype_pool'):
-        #     self.prototype_pool = prototype
-        # else:
-        #     self.prototype_pool = torch.concat([prototype, self.prototype_pool.detach()], 0)
-        #     self.prototype_pool = self.prototype_pool[:self.prototype_pool_size]
         cos_sim = pairwise_cosine_similarity(logits, prototype)
         cos_sim_mean = cos_sim.mean()
         cos_sim = cos_sim / self.temperature
         labels = torch.arange(batch_size // 2).repeat_interleave(2, dim=0).to(cos_sim.device)
         loss = F.cross_entropy(cos_sim, labels)
-        # if self.prototype_pool.shape[0] < self.prototype_pool_size:
-        #     loss = loss.clamp_max(0)
-        #     return loss, cos_sim_mean
         return loss, cos_sim_mean
-_need_eval = False
+
 class ContrastiveLearningTrainer(Trainer):
+
     def compute_loss(self, model, inputs, return_outputs=None):
-        from fics.run import eval_main
-        from fics import EvalArguments
-        global _need_eval
-        if model.training:
-            if _need_eval:
-                output_dir = os.path.join(self.args.output_dir, f'checkpoint-{self.state.global_step}')
-                eval_batch_size = 1
-                dataset = 'tenk-eval'
-                if 'roberta' in self.x_args.model_type:
-                    eval_batch_size = 16
-                if is_master():
-                    eval_args = EvalArguments(self.x_args.model_type,
-                        task_type='eval-tenk',
-                        position_embedding_type=self.x_args.position_embedding_type,
-                        ckpt_dir =output_dir,
-                        dataset=dataset, 
-                        max_length=self.x_args.max_length,
-                        eval_dataset_sample=-1,
-                        eval_batch_size=eval_batch_size,
-                        normalize=self.x_args.normalize,
-                        pooling=self.x_args.pooling,
-                        window_size=self.x_args.window_size)
-                    torch.cuda.empty_cache()
-                    eval_main(eval_args)
-                    torch.cuda.empty_cache()
-                    if is_dist():
-                        dist.barrier()
-                else:
-                    if is_dist():
-                        dist.barrier()
-                _need_eval = False
-        else:
-            _need_eval = True
+        from fics import EvalArguments, eval_main
         if not hasattr(self, '_custom_metrics'):
             self._custom_metrics = {}
         if not hasattr(self, 'loss_fn'):
@@ -116,7 +77,7 @@ class ContrastiveLearningTrainer(Trainer):
         batch_size = inputs['input_ids'].shape[0]
         logits_no_grad = []
         num_prototype_with_grad = self.x_args.num_prototype_with_grad * 2
-        _batch_size = 2 * num_prototype_with_grad
+        _batch_size = 2 * num_prototype_with_grad  # no grad batch size
         for i in range(num_prototype_with_grad, batch_size, _batch_size):
             inputs_no_grad = {k: v[i:i+_batch_size] for k, v in inputs.items()}
             with torch.no_grad():
@@ -132,6 +93,7 @@ class ContrastiveLearningTrainer(Trainer):
         if pooling == 'cls':
             logits = logits[:, 0]
         elif pooling == 'mean':
+            logits = logits.to(torch.float64)
             logits = torch.einsum("ijk,ij->ik", logits, attention_mask.to(logits.dtype))
             logits.div_(attention_mask.sum(dim=1, keepdim=True))
         else:

@@ -88,9 +88,12 @@ class IcsMetrics:
     def update(self, cik_tensor: Tensor, ebd_tensor: Tensor, 
                token_length_tensor: Tensor, date_tensor: Tensor,
                sic_tensor: Tensor, naics_tensor: Tensor,
-               stock_tensor: Tensor) -> None:
+               stock_tensor: Optional[Tensor]) -> None:
         self.ebd_pool.update(cik_tensor, ebd_tensor, token_length_tensor, date_tensor)
-        stock_tensor = stock_tensor.cpu()
+        if stock_tensor is not None:
+            stock_tensor = stock_tensor.cpu()
+        else:
+            stock_tensor = [None] * cik_tensor.shape[0]
         for cik, date, sic, naics, stock in zip(
                 cik_tensor, date_tensor, sic_tensor, naics_tensor, stock_tensor):
             self._info_mapping[(cik.item(), date.item())] = (sic.item(), naics.item(), stock)
@@ -110,6 +113,8 @@ class IcsMetrics:
             res['sic'].append(info[0])
             res['naics'].append(info[1])
             res['stock'].append(info[2])
+        if res['stock'][0] is None:
+            res.pop('stock')
         for k, v in res.items():
             if isinstance(v[0], Tensor):
                 res[k] = torch.stack(v)
