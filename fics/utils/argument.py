@@ -69,7 +69,7 @@ class TrainArguments:
         metadata={'choices': ['cls', 'mean']})
     # lbert
     lbert_window_size: int = 512
-    lbert_max_position_embeddings: int = 131072
+    lbert_max_position_embeddings: Optional[int] = None
     lbert_num_global_token: int = 1
     # prototype loss
     temperature: float = 0.1
@@ -106,6 +106,8 @@ class TrainArguments:
         model_info = MODEL_MAPPING[self.model_type]
         if self.max_length is None:
             self.max_length = model_info['max_length']
+        if self.lbert_max_position_embeddings is None:
+            self.lbert_max_position_embeddings = self.max_length
         if self.task_type is None:
             if 'no-head' in self.model_type:
                 self.task_type = 'contrastive-learning'
@@ -140,7 +142,7 @@ class EvalArguments:
         default='mean', metadata={'choices': ['cls', 'mean']})
     # lbert
     lbert_window_size: int = 512
-    lbert_max_position_embeddings: int = 131072
+    lbert_max_position_embeddings: Optional[int] = None
     lbert_num_global_token: int = 1
 
     def __post_init__(self):
@@ -161,3 +163,5 @@ class EvalArguments:
         model_info = MODEL_MAPPING[self.model_type]
         if self.max_length is None:
             self.max_length = model_info['max_length']
+        if self.lbert_max_position_embeddings is None:
+            self.lbert_max_position_embeddings = self.max_length

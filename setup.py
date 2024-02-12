@@ -39,5 +39,6 @@ setup(
             "nonecheck": False,
             "cdivision": True,
         }),
+    entry_points={'console_scripts': ['fics=fics.cli.main:cli_main']},
     zip_safe=False,
 )

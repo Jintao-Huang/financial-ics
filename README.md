@@ -10,7 +10,8 @@
 ## 📖 Table of Contents
 - [Introduction](#-introduction)
 - [Installation](#-installation)
-- [Usage](#-usage)
+- [Training](#-training)
+- [Evaluation](#-evaluation)
 - [Demo](#-demo)
 - [License](#license)
 
@@ -25,11 +26,30 @@ cd financial-ics
 pip install -e .
 ```
 
-## 🚀 Usage
+## 🚀 Training
+MaskedLM Training
 
+```bash
+
+```
+
+
+Contrastive Learning
+
+```bash
+
+```
+
+## 🎯 Evaluation
+
+```bash
+```
 
 ## ✨ Demo
 
+```bash
+
+```
 
 ## License
 
