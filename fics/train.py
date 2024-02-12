@@ -8,13 +8,12 @@ from swift.llm import get_model_tokenizer, get_dataset
 
 from swift.utils import (
     seed_everything, is_dist, is_ddp_plus_mp, get_dist_setting,
-    show_layers, get_model_info, is_master, check_json_format, plot_images, 
+    show_layers, get_model_info, is_master, check_json_format, plot_images, get_main
 )
 from swift.llm import (
     sort_by_max_length, stat_dataset
 )
 from swift.trainers import TrainingArguments
-from swift.utils import get_main
 import numpy as np
 
 

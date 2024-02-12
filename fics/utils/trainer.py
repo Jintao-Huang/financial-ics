@@ -80,10 +80,7 @@ class ContrastiveLearningTrainer(Trainer):
             if _need_eval:
                 output_dir = os.path.join(self.args.output_dir, f'checkpoint-{self.state.global_step}')
                 eval_batch_size = 1
-                if 'split' in self.x_args.dataset:
-                    dataset = 'tenk-eval-split'
-                else:
-                    dataset = 'tenk-eval'
+                dataset = 'tenk-eval'
                 if 'roberta' in self.x_args.model_type:
                     eval_batch_size = 16
                 if is_master():
@@ -132,18 +129,13 @@ class ContrastiveLearningTrainer(Trainer):
         else:
             logits = logits_with_grad
         pooling = self.x_args.pooling
-        # if pooling == 'cls-32':
-        #     logits = logits[:, 0:32].mean(dim=1)
         if pooling == 'cls':
             logits = logits[:, 0]
         elif pooling == 'mean':
             logits = torch.einsum("ijk,ij->ik", logits, attention_mask.to(logits.dtype))
             logits.div_(attention_mask.sum(dim=1, keepdim=True))
-        elif pooling == 'last':
-            idx = attention_mask.sum(dim=1) - 1
-            logits = logits[torch.arange(idx.shape[0]), idx]
-        if self.x_args.normalize:
-            logits = F.normalize(logits, dim=1)
+        else:
+            raise ValueError(f'pooling: {pooling}')
         if is_dist():
             logits = logits.contiguous()
             logits = torch.concat(GatherLayer.apply(logits))
@@ -159,8 +151,6 @@ class ContrastiveLearningTrainer(Trainer):
 class EvalTenkTrainer(Trainer):
     def compute_loss(self, model, inputs, return_outputs=None):
         if not hasattr(self, '_custom_metrics'):
-            # assert len(signature(self.compute_metrics).parameters) > 1
-            # self.compute_metrics = MethodType(self.compute_metrics, self)
             self._custom_metrics = {}
         assert not model.training
         assert return_outputs is True
@@ -169,24 +159,19 @@ class EvalTenkTrainer(Trainer):
             inputs.pop('labels')
         model_inputs = {k: v for (k, v) in inputs.items() if k not in ignore_keys}
         attention_mask = model_inputs['attention_mask']
-        logits = model(**model_inputs).logits
+        output = model(**model_inputs)
+        logits = output.logits.to(torch.float64)
         pooling = self.x_args.pooling
-        # if pooling == 'cls-32':
-        #     logits = logits[:, 0:32].mean(dim=1)
         if pooling == 'cls':
             logits = logits[:, 0]
         elif pooling == 'mean':
             logits = torch.einsum("ijk,ij->ik", logits, attention_mask.to(logits.dtype))
             logits.div_(attention_mask.sum(dim=1, keepdim=True))
-        elif pooling == 'last':
-            idx = attention_mask.sum(dim=1) - 1
-            logits = logits[torch.arange(idx.shape[0]), idx]
+        else:
+            raise ValueError(f'pooling: {pooling}')
 
-        if self.x_args.normalize:
-            logits = F.normalize(logits, dim=1)
         if 'ics_metrics' not in self._custom_metrics:
-            self._custom_metrics['ics_metrics'] = IcsMetrics(self.args.output_dir, 
-                                                          use_split=self.x_args.use_split)
+            self._custom_metrics['ics_metrics'] = IcsMetrics(self.args.output_dir)
         self._custom_metrics['ics_metrics'].update(
             inputs['cik'], logits, inputs['token_length'], inputs['date'],
             inputs['sic'], inputs['naics'], inputs.get('stock')

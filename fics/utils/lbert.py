@@ -82,7 +82,6 @@ def shift_x(x: torch.Tensor, window_size: int) -> torch.Tensor:
 def shift_attention_mask(attention_mask: torch.Tensor, window_size: int, H: int) -> torch.Tensor:
     N, _, _, L  = attention_mask.shape
     attention_mask = attention_mask.repeat(1, H, 1, 1)
-    attention_mask.data[:, H//2:, :, -window_size // 2:] = float('-inf')  # mask last mix
     attention_mask = torch.concat([attention_mask[:, :H//2], 
                      attention_mask[:, H//2:].roll(-window_size // 2, 3)], dim=1)
     attention_mask = attention_mask.reshape((N, H, L // window_size, 1, window_size))
@@ -161,8 +160,11 @@ class LBertSelfAttention(RobertaSelfAttention):
             block_attn_mask = shift_attention_mask(block_attn_mask, config.window_size, self.num_attention_heads)
             _0 = block_attn_mask.new_zeros(*block_attn_mask.shape[:4], num_global_token)
             block_attn_mask = torch.concat([_0, block_attn_mask], dim=-1)
+            H = attention_scores.shape[1]
             attention_scores = attention_scores + block_attn_mask
-
+            # avoid attention mix
+            attention_scores[:, H//2:, -1, config.window_size//2:, 1:config.window_size//2+1] = torch.finfo(attention_scores.dtype).min
+            attention_scores[:, H//2:, -1, :config.window_size//2, config.window_size//2+1:] = torch.finfo(attention_scores.dtype).min
         # Normalize the attention scores to probabilities.
         attention_probs = nn.functional.softmax(attention_scores, dim=-1)
         attention_probs = self.dropout(attention_probs)

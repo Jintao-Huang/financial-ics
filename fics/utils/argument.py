@@ -131,12 +131,17 @@ class EvalArguments:
     eval_dataset_sample: int = -1  # -1: all dataset
     max_length: Optional[int] = None
     eval_batch_size: Optional[int] = 1
+    preprocess_num_proc: int = 1
+    need_compute: bool = True
 
     # other
     ignore_args_error: bool = False  # True: notebook compatibility
     pooling: str = field(
-        default='mean',
-        metadata={'choices': ['cls', 'mean']})
+        default='mean', metadata={'choices': ['cls', 'mean']})
+    # lbert
+    lbert_window_size: int = 512
+    lbert_max_position_embeddings: int = 131072
+    lbert_num_global_token: int = 1
 
     def __post_init__(self):
         self.torch_dtype, _, _ = select_dtype(self)
