@@ -7,6 +7,7 @@ def compute_maskedlm_metrics(eval_prediction: EvalPrediction) -> Dict[str, Tenso
     labels = eval_prediction.label_ids
     masks = labels != -100
     predictions = eval_prediction.predictions
+    predictions = predictions[masks]
     labels = labels[masks]
     acc = np.mean((predictions == labels).astype(np.float64))
     return {'acc': acc}

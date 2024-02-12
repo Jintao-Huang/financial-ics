@@ -5,7 +5,8 @@ import torch
 
 def test_lbert_maskedlm_train():
     train_main(TrainArguments(CustomModelType.lbert, dataset=[CustomDatasetName.tenk_pretrained_mini],
-                              train_dataset_sample=100, eval_steps=5))
+                              train_dataset_sample=100, eval_steps=5, preprocess_num_proc=4,
+                              dataset_test_ratio=0.5))
     torch.cuda.empty_cache()
     train_main(TrainArguments(CustomModelType.lbert, dataset=[CustomDatasetName.tenk_pretrained_mini],
                               train_dataset_sample=100, eval_steps=5, lbert_num_global_token=16,

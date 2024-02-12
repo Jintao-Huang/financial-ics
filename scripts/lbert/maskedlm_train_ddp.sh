@@ -18,7 +18,7 @@ fics train \
     --max_length 131072 \
     --output_dir output \
     --gradient_checkpointing true \
-    --num_train_epochs 2 \
+    --num_train_epochs 16 \
     --batch_size $batch_size \
     --weight_decay 0.1 \
     --learning_rate 8e-5 \

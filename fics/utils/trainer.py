@@ -9,40 +9,21 @@ from typing import Tuple, NamedTuple, Optional
 from swift.utils import is_dist, is_master
 from torch import Tensor
 import torch.distributed as dist
-from .utils import GatherLayer
 from .metric import IcsMetrics
 MaskedLMOutput = NamedTuple('MaskedLMOutput', loss=Optional[Tensor], logits=Optional[Tensor])
 
-
-def _masked_lm_forward(model, inputs) -> Tuple[Tensor, MaskedLMOutput]:
-    """for save memory"""
-    labels = inputs.pop('labels')
-    outputs = model.roberta(
-        inputs['input_ids'],
-        attention_mask=inputs['attention_mask'])
-    sequence_output = outputs[0]
-    labels = labels.to(sequence_output.device)
-    masked_idx = labels != -100
-    labels = labels[masked_idx]
-    inputs['labels'] = labels
-    sequence_output = sequence_output[masked_idx]
-    logits = model.lm_head(sequence_output)
-    loss_fct = CrossEntropyLoss()
-    masked_lm_loss = loss_fct(logits, labels)
-    output = MaskedLMOutput(loss=masked_lm_loss, logits=logits)
-    return masked_lm_loss, output
 
 class MaskedLMTrainer(Trainer):
     def compute_loss(self, model, inputs, return_outputs=None):
         if not hasattr(self, '_custom_metrics'):
             self._custom_metrics = {}
         inputs.pop('token_length', None)
-        loss, outputs = _masked_lm_forward(model, inputs)
-        preds = outputs.logits.argmax(dim=1)
+        loss, outputs = super().compute_loss(model, inputs, True)
         labels = inputs['labels']
         masks = labels != -100
-        acc: Tensor = (preds == labels[masks]).float().mean()
+        preds = outputs.logits.argmax(dim=1)
         if model.training:
+            acc: Tensor = (preds == labels[masks]).float().mean()
             if 'acc' not in self._custom_metrics:
                 self._custom_metrics['acc'] = torch.tensor(0., device=self.args.device)
             self._custom_metrics[
@@ -100,6 +81,7 @@ class ContrastiveLearningTrainer(Trainer):
             raise ValueError(f'pooling: {pooling}')
         if is_dist():
             logits = logits.contiguous()
+            from .utils import GatherLayer
             logits = torch.concat(GatherLayer.apply(logits))
         loss, cos_sim_mean = self.loss_fn(logits)
         if model.training:

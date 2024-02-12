@@ -1,8 +1,9 @@
 from transformers.models.roberta import (
-    RobertaPreTrainedModel, RobertaForCausalLM, RobertaConfig
+    RobertaPreTrainedModel, RobertaForMaskedLM, RobertaConfig
 )
-from transformers.modeling_outputs import BaseModelOutputWithPoolingAndCrossAttentions
-
+from transformers.modeling_outputs import (BaseModelOutputWithPoolingAndCrossAttentions,
+                                           MaskedLMOutput)
+from torch.nn import CrossEntropyLoss
 from transformers.models.roberta.modeling_roberta import (
     RobertaLMHead, RobertaModel, RobertaEmbeddings, RobertaPooler, RobertaEncoder, RobertaLayer,
     RobertaIntermediate, RobertaOutput, RobertaAttention, RobertaSelfAttention, RobertaSelfOutput,
@@ -263,11 +264,11 @@ class LBertModel(RobertaModel):
         output.last_hidden_state = output.last_hidden_state[:,  self.config.num_global_token:]
         return output
 
-class LBertForMaskedLM(RobertaForCausalLM):
+class LBertForMaskedLM(RobertaForMaskedLM):
     _tied_weights_keys = ["lm_head.decoder.weight", "lm_head.decoder.bias"]
 
     def __init__(self, config):
-        super(RobertaForCausalLM, self).__init__(config)
+        super(RobertaForMaskedLM, self).__init__(config)
 
         if not config.is_decoder:
             logger.warning("If you want to use `RobertaLMHeadModel` as a standalone, add `is_decoder=True.`")
@@ -278,6 +279,65 @@ class LBertForMaskedLM(RobertaForCausalLM):
         # Initialize weights and apply final processing
         self.post_init()
 
+    def forward(
+        self,
+        input_ids: Optional[torch.LongTensor] = None,
+        attention_mask: Optional[torch.FloatTensor] = None,
+        token_type_ids: Optional[torch.LongTensor] = None,
+        position_ids: Optional[torch.LongTensor] = None,
+        head_mask: Optional[torch.FloatTensor] = None,
+        inputs_embeds: Optional[torch.FloatTensor] = None,
+        encoder_hidden_states: Optional[torch.FloatTensor] = None,
+        encoder_attention_mask: Optional[torch.FloatTensor] = None,
+        labels: Optional[torch.LongTensor] = None,
+        past_key_values: Tuple[Tuple[torch.FloatTensor]] = None,
+        use_cache: Optional[bool] = None,
+        output_attentions: Optional[bool] = None,
+        output_hidden_states: Optional[bool] = None,
+        return_dict: Optional[bool] = None,
+    ) -> Union[Tuple[torch.Tensor], MaskedLMOutput]:
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+
+        outputs = self.roberta(
+            input_ids,
+            attention_mask=attention_mask,
+            token_type_ids=token_type_ids,
+            position_ids=position_ids,
+            head_mask=head_mask,
+            inputs_embeds=inputs_embeds,
+            encoder_hidden_states=encoder_hidden_states,
+            encoder_attention_mask=encoder_attention_mask,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+        )
+        sequence_output = outputs[0]
+
+        masked_lm_loss = None
+        # save memory
+        if labels is not None:
+            if self.training:
+                masks = labels != -100
+                sequence_output = sequence_output[masks]
+                labels = labels[masks]
+            prediction_scores = self.lm_head(sequence_output)
+            # move labels to correct device to enable model parallelism
+            labels = labels.to(prediction_scores.device)
+            loss_fct = CrossEntropyLoss()
+            masked_lm_loss = loss_fct(prediction_scores.view(-1, self.config.vocab_size), labels.view(-1))
+        else:
+            prediction_scores = self.lm_head(sequence_output)
+
+        if not return_dict:
+            output = (prediction_scores,) + outputs[2:]
+            return ((masked_lm_loss,) + output) if masked_lm_loss is not None else output
+
+        return MaskedLMOutput(
+            loss=masked_lm_loss,
+            logits=prediction_scores,
+            hidden_states=outputs.hidden_states,
+            attentions=outputs.attentions,
+        )
 
 if __name__ == '__main__':
     # for test
