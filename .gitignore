@@ -1,0 +1,11 @@
+/.vscode/
+/finance_tenk/
+*.so
+*.cpp
+*.o
+/dist
+/build
+*.egg-info/
+__pycache__/
+/output
+/output_eval
