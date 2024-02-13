@@ -9,7 +9,6 @@
 
 ## 📖 Table of Contents
 - [Introduction](#-introduction)
-- [News](#-news)
 - [Installation](#-installation)
 - [Training](#-training)
 - [Evaluation](#-evaluation)
@@ -28,9 +27,6 @@ Our training framework employs a fully unsupervised approach. Firstly, we use a 
 
 We have made the training dataset, code, and model weights publicly available.
 
-
-## 🎉 News
-- 20240215: The dataset, code, and model weights of Financial-ICS are open source.
 
 ## 🛠️ Installation
 ```bash
