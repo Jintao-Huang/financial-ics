@@ -1,7 +1,7 @@
 from transformers import AutoConfig
 from torch import dtype as Dtype
 from swift.llm import register_model, get_model_tokenizer_from_repo
-from .lbert import LBertForMaskedLM, set_lbert_config
+from .lbert import LongBertForMaskedLM, set_lbert_config
 from transformers.models.roberta import RobertaForMaskedLM
 from transformers.models.longformer import LongformerForMaskedLM
 
@@ -63,7 +63,7 @@ def get_lbert_model_tokenizer(model_dir: str,
                                 model_kwargs: Dict[str, Any],
                                 load_model: bool = True,
                                 **kwargs):
-    kwargs['automodel_class'] = LBertForMaskedLM
+    kwargs['automodel_class'] = LongBertForMaskedLM
     model_config = AutoConfig.from_pretrained(model_dir, trust_remote_code=True)
     config_kwargs = {}
     args = kwargs.get('args')

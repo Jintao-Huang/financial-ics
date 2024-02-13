@@ -1,5 +1,5 @@
 # Experimental environment: 4 * A100
-# 4 * 60GB GPU memory
+# 4 * 70GB GPU memory
 nproc_per_node=4
 batch_size=1
 total_batch_size=16

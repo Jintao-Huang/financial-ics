@@ -1,5 +1,5 @@
-# Experimental environment: 2 * A100
-# 2 * 40GB GPU memory
+# Experimental environment: A100
+# 70GB GPU memory
 batch_size=1
 total_batch_size=16
 
@@ -9,7 +9,6 @@ fics train \
     --train_dataset_sample -1 \
     --task_type maskedlm \
     --dtype fp16 \
-    --ddp_backend nccl \
     --dataset tenk-pretrained \
     --preprocess_num_proc 4 \
     --max_length 131072 \

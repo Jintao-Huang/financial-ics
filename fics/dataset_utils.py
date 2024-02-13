@@ -6,14 +6,14 @@ import math
 import json
 
 
-file_folder = 'finance_10k/files'
-train_dataset_path = 'finance_10k/preprocessed/train/train.csv'
-eval_dataset_path = 'finance_10k/preprocessed/eval/eval.jsonl'
-demo_dataset_path = 'finance_10k/preprocessed/demo/demo.csv'
+file_folder = 'finance_tenk/files'
+train_dataset_path = 'finance_tenk/preprocessed/train/train.csv'
+eval_dataset_path = 'finance_tenk/preprocessed/eval/eval.jsonl'
+demo_dataset_path = 'finance_tenk/preprocessed/demo/demo.csv'
 
 def check_dataset() -> None:
     """check file exists"""
-    text_dataset_path = 'finance_10k/readable.csv'
+    text_dataset_path = 'finance_tenk/readable.csv'
     df = pd.read_csv(text_dataset_path, na_filter=False)
     item1_list = df['item1']
     item1a_list = df['item1a']
@@ -26,7 +26,7 @@ def check_dataset() -> None:
                 raise FileNotFoundError(file_path)
 
 def get_cik2sic_mapping() -> Dict[int, int]:
-    cik2sic_path = 'finance_10k/data/cik2sic.csv'
+    cik2sic_path = 'finance_tenk/data/cik2sic.csv'
     cik2sic_df = pd.read_csv(cik2sic_path)
     cik2sic_mapping = {}
     for i in range(cik2sic_df.shape[0]):
@@ -36,7 +36,7 @@ def get_cik2sic_mapping() -> Dict[int, int]:
     return cik2sic_mapping
 
 def get_cik2name_mapping() -> Dict[int, str]:
-    cik2name_path = 'finance_10k/data/cik2name.csv'
+    cik2name_path = 'finance_tenk/data/cik2name.csv'
     cik2name_df = pd.read_csv(cik2name_path)
     cik2name_mapping = {}
     for i in range(cik2name_df.shape[0]):
@@ -46,13 +46,13 @@ def get_cik2name_mapping() -> Dict[int, str]:
     return cik2name_mapping
 
 def _read_sic2naics():
-    sic_naics_mapping_path = 'finance_10k/data/sic2naics.json'
+    sic_naics_mapping_path = 'finance_tenk/data/sic2naics.json'
     with open(sic_naics_mapping_path, 'r') as f:
         data = json.load(f)
     return data
 
 def _get_sic2desc_mapping() -> Dict[int, str]:
-    sic2desc_path = 'finance_10k/data/sic2desc.csv'
+    sic2desc_path = 'finance_tenk/data/sic2desc.csv'
     sic2desc_df = pd.read_csv(sic2desc_path)
     sic2desc_mapping = {}
     for i in range(sic2desc_df.shape[0]):
@@ -109,7 +109,7 @@ def get_naics2desc_mapping():
 
 
 def _get_ticker2cik_mapping():
-    ticker2cik_path = 'finance_10k/data/ticker2cik.csv'
+    ticker2cik_path = 'finance_tenk/data/ticker2cik.csv'
     ticker2cik_df = pd.read_csv(ticker2cik_path)
     ticker2cik_mapping = {}
     for i in range(ticker2cik_df.shape[0]):
@@ -119,7 +119,7 @@ def _get_ticker2cik_mapping():
     return ticker2cik_mapping
 
 def get_cik_stock_mapping() -> Dict[int, List[float]]:
-    stock_path = 'finance_10k/data/stock.csv'
+    stock_path = 'finance_tenk/data/stock.csv'
     ticker2cik_mapping = _get_ticker2cik_mapping()
     stock_df = pd.read_csv(stock_path)
     cik_stock_mapping: Dict[int, List[float]] = {}

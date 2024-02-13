@@ -33,7 +33,7 @@ def set_lbert_config(config: RobertaConfig, **kwargs) -> None:
     config.num_global_token = kwargs.get('num_global_token', 1)
 
 
-class LBertEmbeddings(RobertaEmbeddings):
+class LongBertEmbeddings(RobertaEmbeddings):
     def __init__(self, config):
         super(RobertaEmbeddings, self).__init__()
         self.word_embeddings = nn.Embedding(config.vocab_size, config.hidden_size, padding_idx=config.pad_token_id)
@@ -88,7 +88,7 @@ def shift_attention_mask(attention_mask: torch.Tensor, window_size: int, H: int)
     attention_mask = attention_mask.reshape((N, H, L // window_size, 1, window_size))
     return attention_mask
 
-class LBertSelfAttention(RobertaSelfAttention):
+class LongBertSelfAttention(RobertaSelfAttention):
 
     def __init__(self, config, position_embedding_type=None):
         super(RobertaSelfAttention, self).__init__()
@@ -206,45 +206,41 @@ class LBertSelfAttention(RobertaSelfAttention):
 
         return outputs
 
-class LBertAttention(RobertaAttention):
+class LongBertAttention(RobertaAttention):
     def __init__(self, config, position_embedding_type=None):
         super(RobertaAttention, self).__init__()
-        self.self = LBertSelfAttention(config, position_embedding_type=position_embedding_type)
+        self.self = LongBertSelfAttention(config, position_embedding_type=position_embedding_type)
         self.output = RobertaSelfOutput(config)
         self.pruned_heads = set()
 
 
-class LBertLayer(RobertaLayer):
+class LongBertLayer(RobertaLayer):
     def __init__(self, config):
         super(RobertaLayer, self).__init__()
         self.chunk_size_feed_forward = config.chunk_size_feed_forward
         self.seq_len_dim = 1
-        self.attention = LBertAttention(config)
+        self.attention = LongBertAttention(config)
         self.is_decoder = False
         self.add_cross_attention = False
-        if self.add_cross_attention:
-            if not self.is_decoder:
-                raise ValueError(f"{self} should be used as a decoder model if cross attention is added")
-            self.crossattention = LBertAttention(config, position_embedding_type=None)
         self.intermediate = RobertaIntermediate(config)
         self.output = RobertaOutput(config)
 
 
-class LBertEncoder(RobertaEncoder):
+class LongBertEncoder(RobertaEncoder):
     def __init__(self, config):
         super(RobertaEncoder, self).__init__()
         self.config = config
-        self.layer = nn.ModuleList([LBertLayer(config) for _ in range(config.num_hidden_layers)])
+        self.layer = nn.ModuleList([LongBertLayer(config) for _ in range(config.num_hidden_layers)])
         self.gradient_checkpointing = False
 
 
-class LBertModel(RobertaModel):
+class LongBertModel(RobertaModel):
     def __init__(self, config, add_pooling_layer=True):
         super(RobertaModel, self).__init__(config)
         self.config = config
 
-        self.embeddings = LBertEmbeddings(config)
-        self.encoder = LBertEncoder(config)
+        self.embeddings = LongBertEmbeddings(config)
+        self.encoder = LongBertEncoder(config)
 
         self.pooler = RobertaPooler(config) if add_pooling_layer else None
 
@@ -264,7 +260,7 @@ class LBertModel(RobertaModel):
         output.last_hidden_state = output.last_hidden_state[:,  self.config.num_global_token:]
         return output
 
-class LBertForMaskedLM(RobertaForMaskedLM):
+class LongBertForMaskedLM(RobertaForMaskedLM):
     _tied_weights_keys = ["lm_head.decoder.weight", "lm_head.decoder.bias"]
 
     def __init__(self, config):
@@ -273,7 +269,7 @@ class LBertForMaskedLM(RobertaForMaskedLM):
         if not config.is_decoder:
             logger.warning("If you want to use `RobertaLMHeadModel` as a standalone, add `is_decoder=True.`")
 
-        self.roberta = LBertModel(config, add_pooling_layer=False)
+        self.roberta = LongBertModel(config, add_pooling_layer=False)
         self.lm_head = RobertaLMHead(config)
 
         # Initialize weights and apply final processing
@@ -343,5 +339,5 @@ if __name__ == '__main__':
     # for test
     config = RobertaConfig()
     set_lbert_config(config)
-    model = LBertForMaskedLM(config)
+    model = LongBertForMaskedLM(config)
     print(model)

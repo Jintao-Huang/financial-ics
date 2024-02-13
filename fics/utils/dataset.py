@@ -6,7 +6,7 @@ from swift.llm import register_dataset
 from swift.utils import read_from_jsonl, transform_jsonl_to_df
 from typing import List
 from tqdm import tqdm
-from ..dataset_utils import train_dataset_path, eval_dataset_path, demo_dataset_path
+from ..dataset_utils import train_dataset_path, eval_dataset_path, demo_dataset_path, file_folder
 import os
 
 
@@ -27,7 +27,7 @@ def random_select_df(df: DataFrame, dataset_sample: int) -> DataFrame:
     return df
 
 def read_raw_text(df: DataFrame) -> List[str]:
-    raw_text_path = 'finance_10k/files'
+    raw_text_path = file_folder
     text = []
     for i in tqdm(range(df.shape[0])):
         line = df.iloc[i]
