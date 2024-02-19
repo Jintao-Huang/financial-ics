@@ -34,8 +34,6 @@ def pairwise_corrcoef_amend(X: Tensor, Y: Tensor) -> Tensor:
     Y: [N2, F]
     Z: [N, N2]
     """
-    X = torch.concat([X, -X], dim=-1)
-    Y = torch.concat([Y, -Y], dim=-1)
     X_mean = X.mean(dim=1, keepdim=True)  # [N]
     Y_mean = Y.mean(dim=1, keepdim=True)  # [N2]
     X_diff = X - X_mean
