@@ -17,7 +17,7 @@ from swift.utils import stat_array
 from sklearn.metrics import accuracy_score, precision_recall_fscore_support
 from fics.dataset_utils import get_cik2name_mapping, get_sic2desc_mapping
 from ..utils import get_logger
-from .utils import pairwise_corrcoef_amend, spearman_corrcoef_fast as spearman_corrcoef
+from .utils import pairwise_corrcoef, spearman_corrcoef_fast as spearman_corrcoef
 
 logger = get_logger()
 
@@ -65,7 +65,7 @@ class IcsMetrics:
         self.compute_device = compute_device
         self.reset()
 
-        self.peer_firm_threshold = 50
+        self.peer_firm_threshold_list = [10, 20, 50]
         if self.output_dir is None:
             self.save_to_jsonl = False
             self.save_to_pickle = False
@@ -141,6 +141,7 @@ class IcsMetrics:
         logger.info(f'self.jsonl_path: {self.jsonl_path}')
         with open(self.jsonl_path, "w", encoding="utf-8") as f:
             pass
+        n_saved = 10
         for cik, date, sic, embedding_cos_sim, stock_corrcoef in zip(
             cik_sorted, date_sorted, sic_sorted, embedding_cos_sim_sorted, 
             stock_corrcoef_sorted
@@ -148,11 +149,11 @@ class IcsMetrics:
             keys = ['cik', 'name', 'date', 'sic', 'desc', 
                     'embedding_cos_sim', 'stock_corrcoef']
             res = {k: [] for k in keys}
-            cik: Tensor = cik[:self.peer_firm_threshold]
-            date: Tensor = date[:self.peer_firm_threshold]
-            sic: Tensor = sic[:self.peer_firm_threshold]
-            embedding_cos_sim: Tensor = embedding_cos_sim[:self.peer_firm_threshold]
-            stock_corrcoef: Tensor = stock_corrcoef[:self.peer_firm_threshold]
+            cik: Tensor = cik[:n_saved]
+            date: Tensor = date[:n_saved]
+            sic: Tensor = sic[:n_saved]
+            embedding_cos_sim: Tensor = embedding_cos_sim[:n_saved]
+            stock_corrcoef: Tensor = stock_corrcoef[:n_saved]
 
             for i in range(cik.shape[0]):
                 cik_item = cik[i].item()
@@ -170,21 +171,36 @@ class IcsMetrics:
         embedding = inputs['embedding']
         stock = inputs['stock']
         embedding_cos_sim = pairwise_cosine_similarity(embedding, embedding)
-        stock_corrcoef = pairwise_corrcoef_amend(stock, stock)
+        stock_corrcoef = pairwise_corrcoef(stock, stock)
         inputs['embedding_cos_sim'] = embedding_cos_sim
         inputs['stock_corrcoef'] = stock_corrcoef
 
 
-    def _compute_ebd_stock_spearman(self, inputs: Dict[str, Tensor]) -> Dict[str, float]:
+    def _compute_ebd_stock_spearman(self, inputs: Dict[str, Tensor], peer_firm_threshold: int) -> Dict[str, float]:
         N = inputs['cik'].shape[0]
         embedding_cos_sim = self._remove_diag(inputs['embedding_cos_sim'])
         stock_corrcoef = self._remove_diag(inputs['stock_corrcoef'])
-        sorted_idx = embedding_cos_sim.argsort(dim=-1, descending=True)[:, :self.peer_firm_threshold]
+        n_peers = peer_firm_threshold * N
+        embedding_cos_sim_f = embedding_cos_sim.flatten()
+        stock_corrcoef_f = stock_corrcoef.flatten()
+        sorted_idx = embedding_cos_sim_f.argsort(dim=-1, descending=True)[:n_peers]
+        embedding_cos_sim_f = embedding_cos_sim_f[sorted_idx]
+        stock_corrcoef_f = stock_corrcoef_f[sorted_idx]
+        res = {}
+        res[f'ebd_stock_spearman_{peer_firm_threshold}'] = spearman_corrcoef(embedding_cos_sim_f, stock_corrcoef_f).item()
+        res[f'ebd_stock_mean_{peer_firm_threshold}'] = stock_corrcoef_f.mean().item()
+        return res
+
+    def _compute_ebd_stock_spearman2(self, inputs: Dict[str, Tensor], peer_firm_threshold: int) -> Dict[str, float]:
+        N = inputs['cik'].shape[0]
+        embedding_cos_sim = self._remove_diag(inputs['embedding_cos_sim'])
+        stock_corrcoef = self._remove_diag(inputs['stock_corrcoef'])
+        sorted_idx = embedding_cos_sim.argsort(dim=-1, descending=True)[:, :peer_firm_threshold]
         embedding_cos_sim = embedding_cos_sim[torch.arange(sorted_idx.shape[0])[:, None], sorted_idx]
         stock_corrcoef = stock_corrcoef[torch.arange(sorted_idx.shape[0])[:, None], sorted_idx]
         res = {}
-        res['ebd_stock_spearman'] = spearman_corrcoef(embedding_cos_sim, stock_corrcoef).mean().item()
-        res['ebd_stock_mean'] = stock_corrcoef.mean().item()
+        res[f'ebd_stock_spearman_{peer_firm_threshold}_v2'] = spearman_corrcoef(embedding_cos_sim, stock_corrcoef).mean().item()
+        res[f'ebd_stock_mean_{peer_firm_threshold}_v2'] = stock_corrcoef.mean().item()
         return res
 
     def _generate_pairwise_sicx(self, inputs: Dict[str, Tensor]) -> Tensor:
@@ -205,24 +221,25 @@ class IcsMetrics:
             pairwise_naics += (naics == naics[:, None]).to(torch.float32)
         return pairwise_naics
 
-    def _compute_sicx_stock_spearman(self, inputs: Dict[str, Tensor]) -> Dict[str, float]:
-        pairwise_sic = self._remove_diag(self._generate_pairwise_sicx(inputs))
+    def _compute_sic4_stock_spearman(self, inputs: Dict[str, Tensor]) -> Dict[str, float]:
+        sic = inputs['sic']
+        pairwise_sic = self._remove_diag(sic == sic[:, None])
         stock_corrcoef = self._remove_diag(inputs['stock_corrcoef'])
-        sorted_idx = pairwise_sic.argsort(dim=-1, descending=True)[:self.peer_firm_threshold]
-        pairwise_sic = pairwise_sic[torch.arange(sorted_idx.shape[0])[:, None], sorted_idx]
-        stock_corrcoef = stock_corrcoef[torch.arange(sorted_idx.shape[0])[:, None], sorted_idx]
+        stock_corrcoef = stock_corrcoef[pairwise_sic]
         res = {}
         res['sicx_stock_mean'] = stock_corrcoef.mean().item()
         return res
 
-    def _compute_naicsx_stock_spearman(self, inputs: Dict[str, Tensor]) -> Dict[str, float]:
+    def _compute_naics6_stock_spearman(self, inputs: Dict[str, Tensor]) -> Dict[str, float]:
         stock_corrcoef = inputs['stock_corrcoef']
-        stock_corrcoef = stock_corrcoef[inputs['naics'] != -1][:, inputs['naics'] != -1]
+        naics = inputs['naics']
+        stock_corrcoef = stock_corrcoef[naics != -1][:, naics != -1]
         stock_corrcoef = self._remove_diag(stock_corrcoef)
-        pairwise_naics = self._remove_diag(self._generate_pairwise_naicsx(inputs))
-        sorted_idx = pairwise_naics.argsort(dim=-1, descending=True)[:self.peer_firm_threshold]
-        pairwise_naics = pairwise_naics[torch.arange(sorted_idx.shape[0])[:, None], sorted_idx]
-        stock_corrcoef = stock_corrcoef[torch.arange(sorted_idx.shape[0])[:, None], sorted_idx]
+        pairwise_naics = naics == naics[:, None]
+        pairwise_naics = pairwise_naics[naics != -1][:, naics != -1]
+        pairwise_naics =  self._remove_diag(pairwise_naics)
+        stock_corrcoef = stock_corrcoef[pairwise_naics]
+        # pairwise_naics.sum(dim=-1).float().mean().item()  # 48.73747634887695
         res = {}
         res['naicsx_stock_mean'] = stock_corrcoef.mean().item()
         return res
@@ -313,10 +330,12 @@ class IcsMetrics:
             self._save_peer_firm_to_jsonl(inputs)
         res = {}
         #
-        res.update(self._compute_ebd_stock_spearman(inputs))
-        res.update(self._compute_sicx_stock_spearman(inputs))
+        for peer_firm_threshold in self.peer_firm_threshold_list:
+            res.update(self._compute_ebd_stock_spearman(inputs, peer_firm_threshold))
+            res.update(self._compute_ebd_stock_spearman2(inputs, peer_firm_threshold))
+        res.update(self._compute_sic4_stock_spearman(inputs))
         res.update(self._compute_ebd_sicx_spearman(inputs))
-        res.update(self._compute_naicsx_stock_spearman(inputs))
+        res.update(self._compute_naics6_stock_spearman(inputs))
         res.update(self._compute_ebd_naicsx_spearman(inputs))
 
         print(res)

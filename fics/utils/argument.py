@@ -2,6 +2,8 @@ import os
 from dataclasses import dataclass, field
 import torch
 from swift.llm.utils.argument import select_dtype
+from transformers.utils.versions import require_version
+
 from typing import Optional, List, Literal
 from .utils import get_logger
 from .model import CustomModelType
@@ -57,16 +59,18 @@ class TrainArguments:
     eval_steps: int = 50
     save_steps: Optional[int] = None
     save_only_model: Optional[bool] = True
-    save_total_limit: int = 2  # save last and best. -1: all checkpoints
+    save_total_limit: int = 10  # save last and best. -1: all checkpoints
     logging_steps: int = 5
     dataloader_num_workers: int = 1
     preprocess_num_proc: int = 1
+    deepspeed: Optional[str] = None
 
     # other
     ignore_args_error: bool = False  # True: notebook compatibility
     pooling: str = field(
         default='mean',
         metadata={'choices': ['cls', 'mean']})
+    dropout_p: float = 0.1
     # lbert
     lbert_window_size: int = 512
     lbert_max_position_embeddings: Optional[int] = None
@@ -79,7 +83,17 @@ class TrainArguments:
         self.output_dir = os.path.join(self.output_dir, self.model_type)
         if is_master():
             self.output_dir = add_version_to_work_dir(self.output_dir)
-
+        ds_config_folder = os.path.join(__file__, '..', '..','ds_config')
+        if self.deepspeed == 'default-zero2':
+            self.deepspeed = os.path.abspath(
+                os.path.join(ds_config_folder, 'zero2.json'))
+        if self.deepspeed is not None:
+            require_version('deepspeed')
+            if self.deepspeed.endswith('.json') or os.path.isfile(
+                    self.deepspeed):
+                with open(self.deepspeed, 'r', encoding='utf-8') as f:
+                    self.deepspeed = json.load(f)
+            logger.info(f'Using deepspeed: {self.deepspeed}')
         self.torch_dtype, self.fp16, self.bf16 = select_dtype(self)
         if self.torch_dtype == torch.float16:
             self.torch_dtype = torch.float32
@@ -106,8 +120,6 @@ class TrainArguments:
         model_info = MODEL_MAPPING[self.model_type]
         if self.max_length is None:
             self.max_length = model_info['max_length']
-        if self.lbert_max_position_embeddings is None:
-            self.lbert_max_position_embeddings = self.max_length
         if self.task_type is None:
             if 'no-head' in self.model_type:
                 self.task_type = 'contrastive-learning'
@@ -163,5 +175,4 @@ class EvalArguments:
         model_info = MODEL_MAPPING[self.model_type]
         if self.max_length is None:
             self.max_length = model_info['max_length']
-        if self.lbert_max_position_embeddings is None:
-            self.lbert_max_position_embeddings = self.max_length
+

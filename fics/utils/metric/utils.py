@@ -28,7 +28,7 @@ def spearman_corrcoef_fast(y_pred: Tensor, y_true: Tensor) -> Tensor:
     return pearson_corrcoef(y_pred, y_true)
 
 
-def pairwise_corrcoef_amend(X: Tensor, Y: Tensor) -> Tensor:
+def pairwise_corrcoef(X: Tensor, Y: Tensor) -> Tensor:
     """
     X: [N, F]
     Y: [N2, F]

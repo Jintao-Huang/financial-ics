@@ -68,12 +68,18 @@ def get_lbert_model_tokenizer(model_dir: str,
     config_kwargs = {}
     args = kwargs.get('args')
     if args is not None:
-        config_kwargs['max_position_embeddings'] = args.lbert_max_position_embeddings
+        if args.lbert_max_position_embeddings is not None:
+            config_kwargs['max_position_embeddings'] = args.lbert_max_position_embeddings
         config_kwargs['window_size'] = args.lbert_window_size
         config_kwargs['num_global_token'] = args.lbert_num_global_token
+        if hasattr(args, 'dropout_p'):
+            model_config.attention_probs_dropout_prob = args.dropout_p
+            model_config.hidden_dropout_prob = args.dropout_p
+        
     set_lbert_config(model_config, **config_kwargs)
     model, tokenizer = get_model_tokenizer_roberta(model_dir, torch_dtype, model_kwargs, load_model, 
                                                    model_config=model_config, **kwargs)
     tokenizer.padding_to = model_config.window_size
     tokenizer.num_global_token = model_config.num_global_token
+    tokenizer.model = model
     return model, tokenizer

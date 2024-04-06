@@ -1,4 +1,5 @@
 ms-swift>=1.6.0
+transformers>=4.39
 torchmetrics
 scikit-learn
 cython

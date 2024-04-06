@@ -47,15 +47,15 @@ class PrototypeLoss:
 class ContrastiveLearningTrainer(Trainer):
 
     def compute_loss(self, model, inputs, return_outputs=None):
-        from fics import EvalArguments, eval_main
         if not hasattr(self, '_custom_metrics'):
             self._custom_metrics = {}
         if not hasattr(self, 'loss_fn'):
             self.loss_fn = PrototypeLoss(self.x_args.temperature)
-        inputs.pop('labels')
+        inputs.pop('labels', None)
+        input_ids = inputs['input_ids']
         attention_mask = inputs['attention_mask']
         inputs.pop('token_length', None)
-        batch_size = inputs['input_ids'].shape[0]
+        batch_size = input_ids.shape[0]
         logits_no_grad = []
         num_prototype_with_grad = self.x_args.num_prototype_with_grad * 2
         _batch_size = 2 * num_prototype_with_grad  # no grad batch size
@@ -77,6 +77,9 @@ class ContrastiveLearningTrainer(Trainer):
             logits = logits.to(torch.float64)
             logits = torch.einsum("ijk,ij->ik", logits, attention_mask.to(logits.dtype))
             logits.div_(attention_mask.sum(dim=1, keepdim=True))
+        elif pooling == 'global-mean':
+            logits = logits[:, :model.config.num_global_token]
+            logits = logits.mean(dim=1)
         else:
             raise ValueError(f'pooling: {pooling}')
         if is_dist():
@@ -111,6 +114,9 @@ class EvalTenkTrainer(Trainer):
         elif pooling == 'mean':
             logits = torch.einsum("ijk,ij->ik", logits, attention_mask.to(logits.dtype))
             logits.div_(attention_mask.sum(dim=1, keepdim=True))
+        elif pooling == 'global-mean':
+            logits = logits[:, :model.config.num_global_token]
+            logits = logits.mean(dim=1)
         else:
             raise ValueError(f'pooling: {pooling}')
 

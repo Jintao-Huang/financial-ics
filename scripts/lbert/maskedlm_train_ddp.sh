@@ -1,10 +1,10 @@
-# Experimental environment: 4 * A100
-# 4 * 70GB GPU memory
-nproc_per_node=4
+# Experimental environment: 2 * A100
+# 2 * 70GB GPU memory
+nproc_per_node=2
 batch_size=1
 total_batch_size=16
 
-CUDA_VISIBLE_DEVICES=0,1,2,3 \
+CUDA_VISIBLE_DEVICES=0,1 \
 NPROC_PER_NODE=$nproc_per_node \
 MASTER_PORT=29500 \
 fics train \
@@ -18,7 +18,7 @@ fics train \
     --max_length 131072 \
     --output_dir output \
     --gradient_checkpointing true \
-    --num_train_epochs 16 \
+    --num_train_epochs 20 \
     --batch_size $batch_size \
     --weight_decay 0.1 \
     --learning_rate 8e-5 \
@@ -33,3 +33,4 @@ fics train \
     --lr_scheduler_type linear \
     --lbert_window_size 512 \
     --lbert_num_global_token 16 \
+    --deepspeed default-zero2

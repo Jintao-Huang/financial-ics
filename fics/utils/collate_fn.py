@@ -83,3 +83,9 @@ def maybe_padding_to(tokenizer, inputs) -> None:
         input_ids= inputs['input_ids']
         inputs['global_attention_mask'] = torch.zeros(input_ids.shape, dtype=torch.long, device=input_ids.device)
         inputs['global_attention_mask'][:, 0] = 1
+    if tokenizer.model_type.startswith('lbert'):
+        model = tokenizer.model
+        attention_mask = inputs['attention_mask']
+        global_attention_mask = torch.ones((model.config.num_global_token,), device=attention_mask.device
+                                    )[None].repeat(attention_mask.shape[0], 1)
+        inputs['attention_mask'] = torch.concat([global_attention_mask, attention_mask], dim=1)

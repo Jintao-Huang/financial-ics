@@ -57,22 +57,26 @@ def train(args: TrainArguments) -> str:
             int(args.train_dataset_sample * args.dataset_test_ratio), 1)
         train_idxs = random_state.permutation(args.train_dataset_sample)
         train_dataset = train_dataset.select(train_idxs)
-        if val_dataset.shape[0] > val_dataset_sample:
+        if val_dataset is not None and val_dataset.shape[0] > val_dataset_sample:
             val_idxs = random_state.permutation(val_dataset_sample)
             val_dataset = val_dataset.select(val_idxs)
     logger.info(f'train_dataset: {train_dataset}')
     logger.info(f'val_dataset: {val_dataset}')
     train_dataset = long_doc_dataset_map(train_dataset, task.preprocess, args.preprocess_num_proc)
-    val_dataset = long_doc_dataset_map(val_dataset, task.preprocess, args.preprocess_num_proc)
+    if val_dataset is not None:
+        val_dataset = long_doc_dataset_map(val_dataset, task.preprocess, 1)
+        stat_dataset(val_dataset)
+    else:
+        args.eval_steps = 0
     # Data analysis
     stat_dataset(train_dataset)
-    stat_dataset(val_dataset)
 
     # Setting training_args
     training_args = TrainingArguments(
         output_dir=args.output_dir,
         do_train=True,
         do_eval=True,
+        deepspeed=args.deepspeed,
         evaluation_strategy='steps',
         per_device_train_batch_size=args.batch_size,
         per_device_eval_batch_size=args.eval_batch_size,
@@ -92,7 +96,7 @@ def train(args: TrainArguments) -> str:
         fp16=args.fp16,
         eval_steps=args.eval_steps,
         dataloader_num_workers=args.dataloader_num_workers,
-        load_best_model_at_end=True,
+        load_best_model_at_end=False,
         metric_for_best_model='loss',
         greater_is_better=False,
         optim=args.optim,

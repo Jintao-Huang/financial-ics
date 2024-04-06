@@ -1,4 +1,4 @@
-from fics.utils import spearman_corrcoef_fast, pairwise_corrcoef_amend
+from fics.utils import spearman_corrcoef_fast, pairwise_corrcoef
 import torch
 
 
@@ -10,5 +10,5 @@ if __name__ == '__main__':
 
     x1 = torch.tensor([[0.1, 0.2, 0.1, 0.2], [0.2, -0.2, 0.2, -0.2], [0.1, -0.2, 0.1, -0.2]])
     x2 = torch.tensor([[0.1, -0.1, 0.1, -0.1], [-0.2, 0.2, -0.2, 0.2]])
-    res = pairwise_corrcoef_amend(x1, x2)
-    print(f'pairwise_corrcoef_amend: {res}')
+    res = pairwise_corrcoef(x1, x2)
+    print(f'pairwise_corrcoef: {res}')

@@ -62,7 +62,7 @@ class LongBertEmbeddings(RobertaEmbeddings):
         embeddings = super().forward(*args, **kwargs)
         device = embeddings.device
         num_global_token = self.config.num_global_token
-        pos_ids = torch.arange(num_global_token, device=device)[None].repeat(embeddings.shape[0], 1)
+        pos_ids = torch.arange(num_global_token, device=device)[None].expand(embeddings.shape[0], -1)
         inpus_global_embeds = self.global_token_embedding(pos_ids)
         embeddings = torch.concat([inpus_global_embeds, embeddings], dim=1)
         return embeddings
@@ -82,7 +82,7 @@ def shift_x(x: torch.Tensor, window_size: int) -> torch.Tensor:
 
 def shift_attention_mask(attention_mask: torch.Tensor, window_size: int, H: int) -> torch.Tensor:
     N, _, _, L  = attention_mask.shape
-    attention_mask = attention_mask.repeat(1, H, 1, 1)
+    attention_mask = attention_mask.expand(-1, H, -1, -1)
     attention_mask = torch.concat([attention_mask[:, :H//2], 
                      attention_mask[:, H//2:].roll(-window_size // 2, 3)], dim=1)
     attention_mask = attention_mask.reshape((N, H, L // window_size, 1, window_size))
@@ -147,8 +147,8 @@ class LongBertSelfAttention(RobertaSelfAttention):
         block_q = shift_x(block_q, config.window_size)
         block_k = shift_x(block_k, config.window_size)
         block_v = shift_x(block_v, config.window_size)
-        global_k = k[:, :, None, :num_global_token].repeat((1, 1, block_k.shape[2], 1, 1))
-        global_v = v[:, :, None, :num_global_token].repeat((1, 1, block_v.shape[2], 1, 1))
+        global_k = k[:, :, None, :num_global_token].expand((-1, -1, block_k.shape[2], -1, -1))
+        global_v = v[:, :, None, :num_global_token].expand((-1, -1, block_v.shape[2], -1, -1))
         block_k = torch.concat([global_k, block_k], dim=3)
         block_v = torch.concat([global_v, block_v], dim=3)
 
@@ -191,9 +191,11 @@ class LongBertSelfAttention(RobertaSelfAttention):
         query_layer = self.transpose_for_scores(mixed_query_layer)
         if hasattr(self, 'rotary_emb'):
             kv_seq_len = key_layer.shape[-2]
-            cos, sin = self.rotary_emb(value_layer, seq_len=kv_seq_len)
-            position_ids = torch.arange(0, kv_seq_len, dtype=torch.long, device=query_layer.device)[None]
-            query_layer, key_layer = apply_rotary_pos_emb(query_layer, key_layer, cos, sin, position_ids)
+            position_ids = torch.arange(0, kv_seq_len - self.config.num_global_token, dtype=torch.long, device=query_layer.device)[None]
+            cos, sin = self.rotary_emb(value_layer, position_ids)
+            query_layer[:, :, self.config.num_global_token:], key_layer[:, :, self.config.num_global_token:] = \
+                apply_rotary_pos_emb(query_layer[:, :, self.config.num_global_token:], 
+                                     key_layer[:, :, self.config.num_global_token:], cos, sin)
 
         global_output = self.global_attn(query_layer, key_layer, value_layer, attention_mask)
         block_output = self.block_attn(query_layer, key_layer, value_layer, attention_mask)
@@ -247,18 +249,6 @@ class LongBertModel(RobertaModel):
         # Initialize weights and apply final processing
         self.post_init()
 
-    def forward(
-        self,
-        input_ids: Optional[torch.Tensor] = None,
-        attention_mask: Optional[torch.Tensor] = None,
-        *args, **kwargs
-    ) -> Union[Tuple[torch.Tensor], BaseModelOutputWithPoolingAndCrossAttentions]:
-        global_attention_mask = torch.ones((self.config.num_global_token,), device=input_ids.device
-                                            )[None].repeat(input_ids.shape[0], 1)
-        attention_mask = torch.concat([global_attention_mask, attention_mask], dim=1)
-        output = super().forward(input_ids, attention_mask, *args, **kwargs)
-        output.last_hidden_state = output.last_hidden_state[:,  self.config.num_global_token:]
-        return output
 
 class LongBertForMaskedLM(RobertaForMaskedLM):
     _tied_weights_keys = ["lm_head.decoder.weight", "lm_head.decoder.bias"]
