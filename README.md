@@ -38,7 +38,7 @@ pip install -e .
 Downloading the Dataset
 
 ```bash
-git clone https://www.modelscope.cn/datasets/huangjintao/finance_tenk.git
+git clone https://www.modelscope.cn/datasets/swift/finance_tenk.git
 cd finance_tenk
 tar -xf data.tar
 cd ..
